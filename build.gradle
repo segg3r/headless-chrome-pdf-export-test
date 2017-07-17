@@ -1,0 +1,37 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+mainClassName = 'com.clarabridge.pdfexport.RunnerPDF'
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'eu.appsatori:gradle-fatjar-plugin:0.3'
+    }
+}
+
+apply plugin: 'eu.appsatori.fatjar'
+
+fatJar {
+    exclude 'META-INF/*.DSA'
+	manifest {
+        attributes 'Implementation-Title': 'PDF Export', 'Implementation-Version': project.version
+        attributes 'Main-Class': 'com.clarabridge.pdfexport.RunnerPDF'
+    }
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// https://mvnrepository.com/artifact/io.webfolder/cdp4j
+	compile group: 'io.webfolder', name: 'cdp4j', version: '1.1.0'
+    // https://mvnrepository.com/artifact/com.itextpdf/itextpdf
+    compile group: 'com.itextpdf', name: 'itextpdf', version: '5.5.11'
+}
