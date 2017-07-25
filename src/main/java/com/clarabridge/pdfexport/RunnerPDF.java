@@ -12,6 +12,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static java.awt.Desktop.getDesktop;
@@ -47,22 +48,29 @@ public class RunnerPDF {
 	private static final int FIRST_PAGE = 1;
 
 	public static void main(String[] args) throws IOException, DocumentException {
-		if (args.length != 3) throw new RuntimeException("Wrong arguments array. Expected: "
-				+ "[ url : String, width : int, height : int ]");
+		String url = args.length > 0 ? args[0] : "https://google.com";
+		int width = args.length > 0 ? parseInt(args[1]) : 250;
+		int height = args.length > 0 ? parseInt(args[1]) : 250;
 
-		String url = args[0];
-		int width = parseInt(args[1]);
-		int height = parseInt(args[2]);
+		Runnable runnable = () -> {
+			try {
+				Path preRenderPath = createTempFile("pre-render-pdf", ".pdf");
+				Path postRenderPath = createTempFile("result-pdf", ".pdf");
 
-		Path preRenderPath = createTempFile("pre-render-pdf", ".pdf");
-		Path postRenderPath = createTempFile("result-pdf", ".pdf");
+				generatePDF(preRenderPath, url, width, height);
+				postRenderPDF(preRenderPath, postRenderPath);
 
-		generatePDF(preRenderPath, url, width, height);
-		postRenderPDF(preRenderPath, postRenderPath);
+				if (isDesktopSupported()) {
+					getDesktop().open(preRenderPath.toFile());
+					getDesktop().open(postRenderPath.toFile());
+				}
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		};
 
-		if (isDesktopSupported()) {
-			getDesktop().open(preRenderPath.toFile());
-			getDesktop().open(postRenderPath.toFile());
+		for (int i = 0; i < 10; i++) {
+			new Thread(runnable).start();
 		}
 	}
 
@@ -94,14 +102,27 @@ public class RunnerPDF {
 		});
 	}
 
+	// SessionFactory should be injected in ApplicationContext
+	private static SessionFactory globalSessionFactory;
+
 	private static void executeInHeadlessChrome(Consumer<Session> consumer) {
-		Launcher launcher = new Launcher();
-		try (SessionFactory factory = launcher.launch(HEADLESS_CHROME_ARGUMENTS)) {
-			String context = factory.createBrowserContext();
-			try (Session session = factory.create(context)) {
-				consumer.accept(session);
+		SessionFactory factory = createOrGetSessionFactory();
+
+		String context = factory.createBrowserContext();
+		try (Session session = factory.create(context)) {
+			consumer.accept(session);
+		}
+	}
+
+	private static SessionFactory createOrGetSessionFactory() {
+		synchronized (RunnerPDF.class) {
+			if (globalSessionFactory == null) {
+				Launcher launcher = new Launcher();
+				globalSessionFactory = launcher.launch(HEADLESS_CHROME_ARGUMENTS);
 			}
 		}
+
+		return globalSessionFactory;
 	}
 
 	private static double getPreRenderWidth(int pixelWidth) {
