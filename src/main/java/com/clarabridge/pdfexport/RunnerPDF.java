@@ -3,28 +3,32 @@ package com.clarabridge.pdfexport;
 import com.itextpdf.text.Document;
 import com.itextpdf.text.DocumentException;
 import com.itextpdf.text.Rectangle;
-import com.itextpdf.text.pdf.*;
+import com.itextpdf.text.pdf.PdfContentByte;
+import com.itextpdf.text.pdf.PdfImportedPage;
+import com.itextpdf.text.pdf.PdfReader;
+import com.itextpdf.text.pdf.PdfWriter;
 import io.webfolder.cdp.Launcher;
 import io.webfolder.cdp.session.Session;
 import io.webfolder.cdp.session.SessionFactory;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static java.awt.Desktop.getDesktop;
 import static java.awt.Desktop.isDesktopSupported;
 import static java.lang.Integer.parseInt;
-import static java.lang.Long.parseLong;
 import static java.nio.file.Files.createTempFile;
 import static java.nio.file.Files.write;
 import static java.util.Arrays.asList;
 
 public class RunnerPDF {
 
+	private static final String CHROME_PATH = "D:\\cxstudio\\chromium\\chrome-win32\\chrome.exe";
 	private static final List<String> HEADLESS_CHROME_ARGUMENTS = asList("--headless", "--disable-gpu");
 
 	private static final int ANGULAR_JAVASCRIPT_START_TIMEOUT = 5000;
@@ -69,7 +73,7 @@ public class RunnerPDF {
 			}
 		};
 
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < 1; i++) {
 			new Thread(runnable).start();
 		}
 	}
@@ -117,12 +121,31 @@ public class RunnerPDF {
 	private static SessionFactory createOrGetSessionFactory() {
 		synchronized (RunnerPDF.class) {
 			if (globalSessionFactory == null) {
-				Launcher launcher = new Launcher();
+				Launcher launcher = getLauncher();
 				globalSessionFactory = launcher.launch(HEADLESS_CHROME_ARGUMENTS);
 			}
 		}
 
 		return globalSessionFactory;
+	}
+
+	private static Launcher getLauncher() {
+		int port = findAvailablePort();
+
+		return new CustomLauncher(port)
+				.setCustomChromePaths(Arrays.asList(CHROME_PATH));
+	}
+
+	private static int findAvailablePort() {
+		try {
+			ServerSocket serverSocket = new ServerSocket(0);
+			int result = serverSocket.getLocalPort();
+			serverSocket.close();
+
+			return result;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	private static double getPreRenderWidth(int pixelWidth) {
