@@ -29,7 +29,7 @@ import static java.util.Arrays.asList;
 
 public class RunnerPDF {
 
-	private static final String CHROME_PATH = "D:\\cxstudio\\chromium\\chrome-win32\\chrome.exe";
+	private static final String CHROME_PATH = "d:\\instances\\dev_82\\3rdParty\\chrome-headless\\chrome-win32\\chrome.exe";
 	private static final List<String> HEADLESS_CHROME_ARGUMENTS = asList("--headless", "--disable-gpu");
 
 	private static final int ANGULAR_JAVASCRIPT_START_TIMEOUT = 5000;
