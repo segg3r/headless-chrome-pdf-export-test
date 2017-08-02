@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -29,12 +28,11 @@ import static java.util.Arrays.asList;
 
 public class RunnerPDF {
 
-	private static final String CHROME_PATH = "d:\\instances\\dev_82\\3rdParty\\chrome-headless\\chrome-win32\\chrome.exe";
 	private static final List<String> HEADLESS_CHROME_ARGUMENTS = asList("--headless", "--disable-gpu");
 
 	private static final int ANGULAR_JAVASCRIPT_START_TIMEOUT = 5000;
-	private static final int RESOLVE_ALL_REQUESTS_TIMEOUT = 30000;
-	private static final int REPORT_RENDER_TIMEOUT = 25000;
+	private static final int RESOLVE_ALL_REQUESTS_TIMEOUT = 15000;
+	private static final int REPORT_RENDER_TIMEOUT = 10000;
 
 	private static final boolean NO_LANDSCAPE = false;
 	private static final boolean NO_HEADER_FOOTER = false;
@@ -54,15 +52,16 @@ public class RunnerPDF {
 
 	public static void main(String[] args) throws IOException, DocumentException, InterruptedException {
 		String url = args.length > 0 ? args[0] : "https://google.com";
-		int width = args.length > 0 ? parseInt(args[1]) : 250;
-		int height = args.length > 0 ? parseInt(args[2]) : 250;
+		int width = args.length > 1 ? parseInt(args[1]) : 250;
+		int height = args.length > 2 ? parseInt(args[2]) : 250;
+		String customChromePath = args.length > 3 ? args[3] : null;
 
 		Runnable runnable = () -> {
 			try {
 				Path preRenderPath = createTempFile("pre-render-pdf", ".pdf");
 				Path postRenderPath = createTempFile("result-pdf", ".pdf");
 
-				generatePDF(preRenderPath, url, width, height);
+				generatePDF(preRenderPath, url, width, height, customChromePath);
 				postRenderPDF(preRenderPath, postRenderPath);
 
 				if (isDesktopSupported()) {
@@ -89,8 +88,8 @@ public class RunnerPDF {
 		if (globalSessionFactory != null) globalSessionFactory.close();
 	}
 
-	private static void generatePDF(Path path, String url, int pixelWidth, int pixelHeight) throws IOException {
-		executeInHeadlessChrome((session) -> {
+	private static void generatePDF(Path path, String url, int pixelWidth, int pixelHeight, String customChromePath) throws IOException {
+		executeInHeadlessChrome(customChromePath, (session) -> {
 			try {
 				ChromeRequestPool requestPool = new ChromeRequestPool(session);
 
@@ -120,10 +119,10 @@ public class RunnerPDF {
 	// SessionFactory should be injected in ApplicationContext
 	private static SessionFactory globalSessionFactory;
 
-	private static void executeInHeadlessChrome(Consumer<Session> consumer) {
-		SessionFactory factory = createOrGetSessionFactory();
+	private static void executeInHeadlessChrome(String customChromePath, Consumer<Session> consumer) {
+		SessionFactory factory = createOrGetSessionFactory(customChromePath);
 		try {
-			Thread.sleep(2000);
+			Thread.sleep(10000);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -134,10 +133,10 @@ public class RunnerPDF {
 		}
 	}
 
-	private static SessionFactory createOrGetSessionFactory() {
+	private static SessionFactory createOrGetSessionFactory(String customChromePath) {
 		synchronized (RunnerPDF.class) {
 			if (globalSessionFactory == null) {
-				Launcher launcher = getLauncher();
+				Launcher launcher = getLauncher(customChromePath);
 				globalSessionFactory = launcher.launch(HEADLESS_CHROME_ARGUMENTS);
 			}
 		}
@@ -145,11 +144,13 @@ public class RunnerPDF {
 		return globalSessionFactory;
 	}
 
-	private static Launcher getLauncher() {
+	private static Launcher getLauncher(String customChromePath) {
 		int port = findAvailablePort();
 
-		return new CustomLauncher(port)
-				.setCustomChromePaths(Arrays.asList(CHROME_PATH));
+		CustomLauncher result = new CustomLauncher(port);
+		if (customChromePath != null) result.setCustomChromePaths(asList(customChromePath));
+
+		return result;
 	}
 
 	private static int findAvailablePort() {
