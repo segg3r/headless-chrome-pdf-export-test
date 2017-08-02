@@ -15,6 +15,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
@@ -32,8 +33,8 @@ public class RunnerPDF {
 	private static final List<String> HEADLESS_CHROME_ARGUMENTS = asList("--headless", "--disable-gpu");
 
 	private static final int ANGULAR_JAVASCRIPT_START_TIMEOUT = 5000;
-	private static final int RESOLVE_ALL_REQUESTS_TIMEOUT = 10000;
-	private static final int REPORT_RENDER_TIMEOUT = 5000;
+	private static final int RESOLVE_ALL_REQUESTS_TIMEOUT = 30000;
+	private static final int REPORT_RENDER_TIMEOUT = 25000;
 
 	private static final boolean NO_LANDSCAPE = false;
 	private static final boolean NO_HEADER_FOOTER = false;
@@ -51,10 +52,10 @@ public class RunnerPDF {
 	private static final float NO_MARGIN_FLOAT = 0.f;
 	private static final int FIRST_PAGE = 1;
 
-	public static void main(String[] args) throws IOException, DocumentException {
+	public static void main(String[] args) throws IOException, DocumentException, InterruptedException {
 		String url = args.length > 0 ? args[0] : "https://google.com";
 		int width = args.length > 0 ? parseInt(args[1]) : 250;
-		int height = args.length > 0 ? parseInt(args[1]) : 250;
+		int height = args.length > 0 ? parseInt(args[2]) : 250;
 
 		Runnable runnable = () -> {
 			try {
@@ -73,9 +74,19 @@ public class RunnerPDF {
 			}
 		};
 
+		List<Thread> threads = new ArrayList<>();
 		for (int i = 0; i < 1; i++) {
-			new Thread(runnable).start();
+			Thread thread = new Thread(runnable);
+			threads.add(thread);
+			thread.start();
 		}
+
+		for (Thread thread : threads) {
+			thread.join();
+		}
+
+		// this should be in PreDestroy
+		if (globalSessionFactory != null) globalSessionFactory.close();
 	}
 
 	private static void generatePDF(Path path, String url, int pixelWidth, int pixelHeight) throws IOException {
@@ -111,6 +122,11 @@ public class RunnerPDF {
 
 	private static void executeInHeadlessChrome(Consumer<Session> consumer) {
 		SessionFactory factory = createOrGetSessionFactory();
+		try {
+			Thread.sleep(2000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 
 		String context = factory.createBrowserContext();
 		try (Session session = factory.create(context)) {
