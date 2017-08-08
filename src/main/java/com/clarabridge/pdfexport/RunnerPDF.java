@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static com.clarabridge.pdfexport.WindowsProcessHelper.getPidByListeningPort;
+import static com.clarabridge.pdfexport.WindowsProcessHelper.killProcess;
 import static java.awt.Desktop.getDesktop;
 import static java.awt.Desktop.isDesktopSupported;
 import static java.lang.Integer.parseInt;
@@ -30,6 +32,7 @@ public class RunnerPDF {
 
 	private static final List<String> HEADLESS_CHROME_ARGUMENTS = asList("--headless", "--disable-gpu");
 
+	private static final int CHROME_STARTUP_TIMEOUT = 10000;
 	private static final int ANGULAR_JAVASCRIPT_START_TIMEOUT = 5000;
 	private static final int RESOLVE_ALL_REQUESTS_TIMEOUT = 15000;
 	private static final int REPORT_RENDER_TIMEOUT = 10000;
@@ -50,7 +53,7 @@ public class RunnerPDF {
 	private static final float NO_MARGIN_FLOAT = 0.f;
 	private static final int FIRST_PAGE = 1;
 
-	public static void main(String[] args) throws IOException, DocumentException, InterruptedException {
+	public static void main(String[] args) throws Exception {
 		String url = args.length > 0 ? args[0] : "https://google.com";
 		int width = args.length > 1 ? parseInt(args[1]) : 250;
 		int height = args.length > 2 ? parseInt(args[2]) : 250;
@@ -86,6 +89,12 @@ public class RunnerPDF {
 
 		// this should be in PreDestroy
 		if (globalSessionFactory != null) globalSessionFactory.close();
+		if (globalPort != 0) {
+			int pid = getPidByListeningPort(globalPort);
+			if (pid != -1) {
+				killProcess(pid);
+			}
+		}
 	}
 
 	private static void generatePDF(Path path, String url, int pixelWidth, int pixelHeight, String customChromePath) throws IOException {
@@ -118,11 +127,12 @@ public class RunnerPDF {
 
 	// SessionFactory should be injected in ApplicationContext
 	private static SessionFactory globalSessionFactory;
+	private static int globalPort;
 
 	private static void executeInHeadlessChrome(String customChromePath, Consumer<Session> consumer) {
 		SessionFactory factory = createOrGetSessionFactory(customChromePath);
 		try {
-			Thread.sleep(10000);
+			Thread.sleep(CHROME_STARTUP_TIMEOUT);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -145,9 +155,9 @@ public class RunnerPDF {
 	}
 
 	private static Launcher getLauncher(String customChromePath) {
-		int port = findAvailablePort();
+		globalPort = findAvailablePort();
 
-		CustomLauncher result = new CustomLauncher(port);
+		CustomLauncher result = new CustomLauncher(globalPort);
 		if (customChromePath != null) result.setCustomChromePaths(asList(customChromePath));
 
 		return result;
